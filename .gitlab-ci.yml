@@ -1,0 +1,30 @@
+default:
+  image: rust:alpine3.13
+  before_script:
+    - apk add --no-cache alpine-sdk
+    - rustc --version 
+    - cargo --version
+  tags:
+    - rustbuilder
+
+stages:
+  - build
+  - test
+
+build:
+  stage: build
+  script:
+    - cargo build --verbose
+
+lint:
+  stage: test
+  script:
+    - rustup component add rustfmt
+    - cargo fmt -- --check
+    - rustup component add clippy
+    - cargo clippy -- -D warnings
+
+test:
+  stage: test
+  script:
+    - cargo test --verbose
