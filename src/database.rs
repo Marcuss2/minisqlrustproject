@@ -1,4 +1,6 @@
-use tokio::net::TcpStream;
+use std::sync::Arc;
+
+use tokio::{net::TcpStream, sync::RwLock};
 
 use crate::{error::DatabaseError, parser::Command};
 
@@ -36,9 +38,15 @@ pub struct DatabaseTable {
     pub attributes: Vec<Attribute>,
 }
 
+pub enum DatabaseResponse {
+    Nothing,
+    Id(i64),
+    Data(Vec<Vec<DataAttribute>>),
+}
+
 #[derive(Default)]
 pub struct Database {
-    tables: Vec<DatabaseTable>,
+    pub tables: Arc<RwLock<Vec<DatabaseTable>>>,
 }
 
 impl Database {
@@ -46,7 +54,7 @@ impl Database {
         &self,
         name: &str,
         attributes: Vec<Attribute>,
-    ) -> Result<(), DatabaseError> {
+    ) -> Result<DatabaseResponse, DatabaseError> {
         todo!()
     }
 
@@ -54,7 +62,7 @@ impl Database {
         &self,
         table_name: &str,
         data: DataAttributes,
-    ) -> Result<(), DatabaseError> {
+    ) -> Result<DatabaseResponse, DatabaseError> {
         todo!()
     }
 
@@ -63,7 +71,7 @@ impl Database {
         table_name: &str,
         attr_pos: usize,
         comparison: &Comparison,
-    ) -> Result<(), DatabaseError> {
+    ) -> Result<DatabaseResponse, DatabaseError> {
         todo!()
     }
 
@@ -73,11 +81,11 @@ impl Database {
         attr_pos: usize,
         comparison: &Comparison,
         selected: Vec<usize>,
-    ) -> Result<(), DatabaseError> {
+    ) -> Result<DatabaseResponse, DatabaseError> {
         todo!()
     }
 
-    pub async fn drop(&self, table_name: &str) -> Result<(), DatabaseError> {
+    pub async fn drop_table(&self, table_name: &str) -> Result<DatabaseResponse, DatabaseError> {
         todo!()
     }
 }

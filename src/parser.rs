@@ -1,4 +1,8 @@
-use crate::database::{Attribute, Comparison, DataAttributes, DatabaseTable};
+use std::sync::Arc;
+
+use tokio::sync::RwLock;
+
+use crate::{database::{Attribute, Comparison, DataAttributes, DatabaseTable}, error::ParseError};
 
 #[non_exhaustive]
 pub enum Command {
@@ -9,6 +13,6 @@ pub enum Command {
     Drop { name: String },
 }
 
-pub fn parse(input: &str, tables: &[DatabaseTable]) -> Vec<Command> {
+pub async fn parse(input: &str, tables: Arc<RwLock<Vec<DatabaseTable>>>) -> Result<Command, ParseError> {
     todo!()
 }
