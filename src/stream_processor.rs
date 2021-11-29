@@ -1,8 +1,7 @@
 use std::sync::Arc;
-
 use tokio::net::TcpStream;
-
 use crate::database::Database;
+use ron::ser::to_string;
 
 #[derive(Default)]
 pub struct StreamProcessor {
@@ -35,6 +34,8 @@ impl StreamProcessor {
             }
             crate::parser::Command::Drop { name } => database.drop_table(&name).await?,
         };
-        todo!()
+        let res = to_string(&response)?;
+        stream.try_write(res.as_bytes())?;
+        Ok(())
     }
 }

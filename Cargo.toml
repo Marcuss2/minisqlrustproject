@@ -10,3 +10,5 @@ edition = "2021"
 anyhow = "1.0"
 tokio = { version = "1", features = ["full"] }
 dotenv = "0.15.0"
+serde = { version = "1.0.130", features = ["derive"] }
+ron = "0.7"

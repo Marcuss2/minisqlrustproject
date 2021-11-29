@@ -37,7 +37,7 @@ pub enum ParseError {
 impl Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let message = match self {
-            SyntaxError => "SyntaxError",
+            ParseError::SyntaxError => "SyntaxError",
             _ => "Unknown error",
         };
         f.write_str(message)
