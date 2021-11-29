@@ -1,5 +1,7 @@
-use std::{error::Error, fmt::{Display, Write}};
-
+use std::{
+    error::Error,
+    fmt::{Display, Write},
+};
 
 #[non_exhaustive]
 #[derive(Debug)]
@@ -24,9 +26,7 @@ impl Display for DatabaseError {
     }
 }
 
-impl Error for DatabaseError {
-
-}
+impl Error for DatabaseError {}
 
 #[non_exhaustive]
 #[derive(Debug)]
@@ -48,7 +48,6 @@ impl Error for ParseError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         None
     }
-
 
     fn description(&self) -> &str {
         "description() is deprecated; use Display"

@@ -2,7 +2,10 @@ use std::{collections::HashMap, sync::Arc};
 
 use tokio::sync::RwLock;
 
-use crate::{database::{Attribute, Comparison, DataAttributes, DatabaseTable}, error::ParseError};
+use crate::{
+    database::{Attribute, Comparison, DataAttributes, DatabaseTable},
+    error::ParseError,
+};
 
 #[non_exhaustive]
 pub enum Command {
@@ -13,6 +16,9 @@ pub enum Command {
     Drop { name: String },
 }
 
-pub async fn parse(input: &str, tables: Arc<RwLock<HashMap<String, DatabaseTable>>>) -> Result<Command, ParseError> {
+pub async fn parse(
+    input: &str,
+    tables: Arc<RwLock<HashMap<String, DatabaseTable>>>,
+) -> Result<Command, ParseError> {
     todo!()
 }
