@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, ptr::hash, sync::Arc};
 
 use atomic_counter::{AtomicCounter, RelaxedCounter};
 use tokio::{join, sync::RwLock};
@@ -7,27 +7,30 @@ use crate::error::DatabaseError;
 
 use serde::Serialize;
 
+#[derive(PartialEq)]
 pub enum Comparison {
     All,
-    Higher(i64),
-    Lower(i64),
+    Higher(DataAttribute),
+    Lower(DataAttribute),
     Equal(DataAttribute),
 }
 
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Debug, PartialEq, PartialOrd, Clone)]
 pub enum DataAttribute {
     String(String),
     Number(i64),
+    Id(i64),
     Data(Vec<u8>),
     NoneId,
     None,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Default)]
 pub struct DataAttributes {
     pub attributes: Vec<DataAttribute>,
 }
 
+#[derive(PartialEq)]
 pub enum AttributeType {
     Id,
     String,
@@ -46,7 +49,7 @@ pub struct DatabaseTable {
     pub counter: RelaxedCounter,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub enum DatabaseResponse {
     Nothing,
     Id(i64),
@@ -55,7 +58,7 @@ pub enum DatabaseResponse {
 
 #[derive(Default, Debug)]
 pub struct TableDataChunk {
-    pub data: RwLock<Vec<DataAttributes>>,
+    pub data: Arc<RwLock<Vec<DataAttributes>>>,
 }
 
 pub struct TableData {
@@ -69,6 +72,10 @@ impl Default for TableData {
     }
 }
 
+fn hash_id(id: i64) -> usize {
+    (id as u64 & 0b1111_1111) as usize
+}
+
 #[derive(Default)]
 pub struct Database {
     pub tables: Arc<RwLock<HashMap<String, DatabaseTable>>>,
@@ -76,20 +83,101 @@ pub struct Database {
 }
 
 fn new_tabledata() -> [TableDataChunk; 256] {
-    (0..255).map(|_| TableDataChunk::default()).collect::<Vec<_>>().try_into().unwrap()
+    (0..256).map(|_| TableDataChunk::default()).collect::<Vec<_>>().try_into().unwrap()
 }
 
 impl TableData {
     async fn add(&self, mut data: DataAttributes) -> i64 {
         let current_id = self.counter.inc() as i64;
         for id in data.attributes.iter_mut().filter(|att| **att == DataAttribute::NoneId) {
-            *id = DataAttribute::Number(current_id);
+            *id = DataAttribute::Id(current_id);
         }
-        let chunk_num = (current_id as u64 & 0b1111_1111) as usize;
+        let chunk_num = hash_id(current_id);
         let mut write_lock = self.chunks[chunk_num].data.write().await;
         write_lock.push(data);
         current_id
     }
+
+    async fn delete_closure_comp(
+        &self,
+        attr_pos: usize,
+        att: &DataAttribute,
+        closure: fn(&DataAttribute, &DataAttribute) -> bool,
+    ) {
+        // All chunks are handled asynchronously
+        let mut futures_vec = vec![];
+        for i in 0..256usize {
+            let data = self.chunks[i].data.clone();
+            let att_clone = (*att).clone();
+            futures_vec.push(tokio::spawn(async move {
+                data.write().await.retain(|item| !closure(&item.attributes[attr_pos], &att_clone));
+            }));
+        }
+        for handle in futures_vec {
+            handle.await.unwrap();
+        }
+    }
+
+    async fn delete(&self, attr_pos: usize, comparison: &Comparison) {
+        match comparison {
+            Comparison::All => {
+                self.delete_closure_comp(attr_pos, &DataAttribute::None, |_, _| true)
+            }
+            Comparison::Higher(attr) => {
+                self.delete_closure_comp(attr_pos, attr, |num, att| *num > *att)
+            }
+            Comparison::Lower(attr) => {
+                self.delete_closure_comp(attr_pos, attr, |num, att| *num < *att)
+            }
+            Comparison::Equal(attr) => {
+                self.delete_closure_comp(attr_pos, attr, |num, att| *num == *att)
+            }
+        }
+        .await;
+    }
+
+    async fn get(
+        &self,
+        attr_pos: usize,
+        comparison: &Comparison,
+        selected: Vec<usize>,
+    ) -> Vec<DataAttributes> {
+        todo!()
+    }
+
+    async fn delete_id(&self, attr_pos: usize, id: i64) {
+        let chunk_id = hash_id(id);
+        let chunk = &self.chunks[chunk_id];
+        let mut chunk_lock = chunk.data.write().await;
+        let index =
+            chunk_lock.iter().position(|item| item.attributes[attr_pos] == DataAttribute::Id(id));
+        if let Some(val) = index {
+            chunk_lock.remove(val);
+        }
+    }
+
+    async fn get_by_id(
+        &self,
+        id: i64,
+        attr_pos: usize,
+        selected: Vec<usize>,
+    ) -> Vec<DataAttributes> {
+        let chunk_id = hash_id(id);
+        let chunk = &self.chunks[chunk_id];
+        let chunk_lock = chunk.data.read().await;
+        let item = chunk_lock.iter().find(|i| i.attributes[attr_pos] == DataAttribute::Id(id));
+        if item.is_none() {
+            return vec![];
+        }
+        let item = item.unwrap();
+        let mut attributes = DataAttributes { attributes: vec![]};
+        for i in selected {
+            attributes.attributes.push(item.attributes[i].clone());
+        }
+        vec![attributes]
+    }
+
+
 }
 
 impl Database {
@@ -123,13 +211,46 @@ impl Database {
         Ok(DatabaseResponse::Id(id))
     }
 
+    async fn is_attr_id(&self, table_name: &str, attr_pos: usize) -> bool {
+        let schema_lock = self.tables.read().await;
+        let table = schema_lock.get(table_name);
+        if table.is_none() {
+            return false;
+        }
+        let table = table.unwrap();
+        table.attributes[attr_pos].attribute_type == AttributeType::Id
+    }
+
+    fn is_eq_comparison(comp: &Comparison) -> bool {
+        if let Comparison::Equal(_) = comp {
+            return true;
+        }
+        false
+    }
+
     pub async fn delete(
         &self,
         table_name: &str,
         attr_pos: usize,
         comparison: &Comparison,
     ) -> Result<DatabaseResponse, DatabaseError> {
-        todo!()
+        let is_id = self.is_attr_id(table_name, attr_pos).await;
+        let read_lock = self.data.read().await;
+        let db_data = read_lock.get(table_name);
+        if db_data.is_none() {
+            return Err(DatabaseError::TableDoesNotExist);
+        }
+        let db_data = db_data.unwrap();
+        if is_id && Self::is_eq_comparison(comparison) {
+            if let Comparison::Equal(DataAttribute::Id(id)) = comparison {
+                db_data.delete_id(attr_pos, *id).await;
+            } else {
+                panic!("DataAttribute was not Id");
+            }
+        } else {
+            db_data.delete(attr_pos, comparison).await;
+        }
+        Ok(DatabaseResponse::Nothing)
     }
 
     pub async fn select(
@@ -139,10 +260,58 @@ impl Database {
         comparison: &Comparison,
         selected: Vec<usize>,
     ) -> Result<DatabaseResponse, DatabaseError> {
-        todo!()
+        let is_id = self.is_attr_id(table_name, attr_pos).await;
+        let read_lock = self.data.read().await;
+        let db_data = read_lock.get(table_name);
+        if db_data.is_none() {
+            return Err(DatabaseError::TableDoesNotExist);
+        }
+        let db_data = db_data.unwrap();
+        if is_id && Self::is_eq_comparison(comparison) {
+            if let Comparison::Equal(DataAttribute::Id(id)) = comparison {
+                return Ok(DatabaseResponse::Data(
+                    db_data.get_by_id(*id, attr_pos, selected).await,
+                ));
+            } else {
+                panic!("DataAttribute was not Id");
+            }
+        }
+        Ok(DatabaseResponse::Data(db_data.get(attr_pos, comparison, selected).await))
     }
 
     pub async fn drop_table(&self, table_name: &str) -> Result<DatabaseResponse, DatabaseError> {
-        todo!()
+        self.tables.write().await.remove(table_name);
+        self.data.write().await.remove(table_name);
+        Ok(DatabaseResponse::Nothing)
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use crate::database::{DatabaseResponse, DataAttributes, DataAttribute};
+
+    use super::{Database, AttributeType, Attribute};
+
+    async fn fill_db() -> Database {
+        let db = Database::default();
+        let mut attributes = vec![];
+        attributes.push(Attribute { name: "id".to_string(), attribute_type: AttributeType::Id});
+        attributes.push(Attribute { name: "name".to_string(), attribute_type: AttributeType::String});
+        attributes.push(Attribute { name: "age".to_string(), attribute_type: AttributeType::Number});
+        attributes.push(Attribute { name: "lotto_numbers".to_string(), attribute_type: AttributeType::Data});
+        assert!(db.create_table("people", attributes).await.is_ok());
+        let mut add_data = DataAttributes::default();
+        add_data.attributes.push(DataAttribute::NoneId);
+        add_data.attributes.push(DataAttribute::String("John Smith".to_string()));
+        add_data.attributes.push(DataAttribute::Number(32));
+        add_data.attributes.push(DataAttribute::Data(vec![1, 2, 3]));
+        assert!(db.insert("people", add_data).await.is_ok());
+        db
+    }
+
+    #[tokio::test]
+    async fn fill_db_test() {
+        fill_db().await;
     }
 }
