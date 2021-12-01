@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ptr::hash, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use atomic_counter::{AtomicCounter, RelaxedCounter};
 use tokio::{join, sync::RwLock};
@@ -25,7 +25,7 @@ pub enum DataAttribute {
     None,
 }
 
-#[derive(Serialize, Debug, Default)]
+#[derive(Serialize, Debug, Default, PartialEq, Clone)]
 pub struct DataAttributes {
     pub attributes: Vec<DataAttribute>,
 }
@@ -49,7 +49,7 @@ pub struct DatabaseTable {
     pub counter: RelaxedCounter,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, PartialEq)]
 pub enum DatabaseResponse {
     Nothing,
     Id(i64),
@@ -118,6 +118,45 @@ impl TableData {
         }
     }
 
+    async fn select_closure_comp(
+        &self,
+        attr_pos: usize,
+        att: &DataAttribute,
+        selected: Vec<usize>,
+        closure: fn(&DataAttribute, &DataAttribute) -> bool,
+    ) -> Vec<DataAttributes> {
+        let selected = Arc::new(selected);
+        let mut futures_vec = vec![];
+        for i in 0..256usize {
+            let data = self.chunks[i].data.clone();
+            let att_clone = (*att).clone();
+            let selected = selected.clone();
+            let future = async move {
+                let mut ret = vec![];
+                for item in data
+                    .read()
+                    .await
+                    .iter()
+                    .filter(|elem| closure(&elem.attributes[attr_pos], &att_clone))
+                {
+                    let mut data_attr = DataAttributes::default();
+                    for i in selected.iter() {
+                        data_attr.attributes.push(item.attributes[*i].clone());
+                    }
+                    ret.push(data_attr);
+                }
+                ret
+            };
+            futures_vec.push(tokio::spawn(future));
+        }
+        let mut ret = vec![];
+        for handle in futures_vec.iter_mut() {
+            ret.append(&mut handle.await.unwrap());
+        }
+
+        ret
+    }
+
     async fn delete(&self, attr_pos: usize, comparison: &Comparison) {
         match comparison {
             Comparison::All => {
@@ -142,7 +181,21 @@ impl TableData {
         comparison: &Comparison,
         selected: Vec<usize>,
     ) -> Vec<DataAttributes> {
-        todo!()
+        match comparison {
+            Comparison::All => {
+                self.select_closure_comp(attr_pos, &DataAttribute::None, selected, |_, _| true)
+            }
+            Comparison::Higher(attr) => {
+                self.select_closure_comp(attr_pos, attr, selected, |num, att| *num > *att)
+            }
+            Comparison::Lower(attr) => {
+                self.select_closure_comp(attr_pos, attr, selected, |num, att| *num < *att)
+            }
+            Comparison::Equal(attr) => {
+                self.select_closure_comp(attr_pos, attr, selected, |num, att| *num == *att)
+            }
+        }
+        .await
     }
 
     async fn delete_id(&self, attr_pos: usize, id: i64) {
@@ -170,14 +223,12 @@ impl TableData {
             return vec![];
         }
         let item = item.unwrap();
-        let mut attributes = DataAttributes { attributes: vec![]};
+        let mut attributes = DataAttributes { attributes: vec![] };
         for i in selected {
             attributes.attributes.push(item.attributes[i].clone());
         }
         vec![attributes]
     }
-
-
 }
 
 impl Database {
@@ -286,20 +337,24 @@ impl Database {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use crate::database::{DatabaseResponse, DataAttributes, DataAttribute};
+    use crate::database::{DataAttribute, DataAttributes, DatabaseResponse};
 
-    use super::{Database, AttributeType, Attribute};
+    use super::{Attribute, AttributeType, Comparison, Database};
 
     async fn fill_db() -> Database {
         let db = Database::default();
         let mut attributes = vec![];
-        attributes.push(Attribute { name: "id".to_string(), attribute_type: AttributeType::Id});
-        attributes.push(Attribute { name: "name".to_string(), attribute_type: AttributeType::String});
-        attributes.push(Attribute { name: "age".to_string(), attribute_type: AttributeType::Number});
-        attributes.push(Attribute { name: "lotto_numbers".to_string(), attribute_type: AttributeType::Data});
+        attributes.push(Attribute { name: "id".to_string(), attribute_type: AttributeType::Id });
+        attributes
+            .push(Attribute { name: "name".to_string(), attribute_type: AttributeType::String });
+        attributes
+            .push(Attribute { name: "age".to_string(), attribute_type: AttributeType::Number });
+        attributes.push(Attribute {
+            name: "lotto_numbers".to_string(),
+            attribute_type: AttributeType::Data,
+        });
         assert!(db.create_table("people", attributes).await.is_ok());
         let mut add_data = DataAttributes::default();
         add_data.attributes.push(DataAttribute::NoneId);
@@ -313,5 +368,52 @@ mod tests {
     #[tokio::test]
     async fn fill_db_test() {
         fill_db().await;
+    }
+
+    #[tokio::test]
+    async fn delete_data() {
+        let db = fill_db().await;
+        let attribute = DataAttribute::String("John Smith".to_string());
+        assert!(db.delete("people", 1, &Comparison::Equal(attribute)).await.is_ok());
+        let attribute = DataAttribute::Id(0);
+        let selected = vec![0];
+        let res = db.select("people", 0, &Comparison::Equal(attribute), selected).await;
+        assert!(res.is_ok());
+        let res = res.unwrap();
+        let expected_res = DatabaseResponse::Data(vec![]);
+        assert_eq!(res, expected_res);
+    }
+
+    #[tokio::test]
+    async fn get_id() {
+        let db = fill_db().await;
+        let attribute = DataAttribute::Id(0);
+        let selected = vec![0, 1, 2, 3];
+        let res = db.select("people", 0, &Comparison::Equal(attribute), selected).await;
+        assert!(res.is_ok());
+        let res = res.unwrap();
+        let mut attrs = vec![];
+        attrs.push(DataAttribute::Id(0));
+        attrs.push(DataAttribute::String("John Smith".to_string()));
+        attrs.push(DataAttribute::Number(32));
+        attrs.push(DataAttribute::Data(vec![1, 2, 3]));
+        let attrs = DataAttributes { attributes: attrs };
+        let db_response = DatabaseResponse::Data(vec![attrs]);
+        assert_eq!(res, db_response);
+    }
+
+    #[tokio::test]
+    async fn get_all() {
+        let db = fill_db().await;
+        let selected = vec![1, 2, 3];
+        let res = db.select("people", 0, &Comparison::All, selected).await;
+        assert!(res.is_ok());
+        let res = res.unwrap();
+        if let DatabaseResponse::Data(data) = res {
+            assert_eq!(data.len(), 1);
+            assert_eq!(data[0].attributes.len(), 3);
+        } else {
+            panic!();
+        }
     }
 }

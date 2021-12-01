@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use database::Database;
 use dotenv::dotenv;
 use tokio::net::TcpListener;
 
