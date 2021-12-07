@@ -58,11 +58,79 @@ pub enum DatabaseResponse {
 
 #[derive(Default, Debug)]
 pub struct TableDataChunk {
-    pub data: Arc<RwLock<Vec<DataAttributes>>>,
+    data: RwLock<Vec<DataAttributes>>,
+}
+
+impl TableDataChunk {
+    pub async fn select_by_closure(
+        &self,
+        attr_pos: usize,
+        att_clone: &DataAttribute,
+        selected: Arc<Vec<usize>>,
+        comparison: fn(&DataAttribute, &DataAttribute) -> bool,
+    ) -> Vec<DataAttributes> {
+        let mut ret = vec![];
+        for item in self
+            .data
+            .read()
+            .await
+            .iter()
+            .filter(|elem| comparison(&elem.attributes[attr_pos], &att_clone))
+        {
+            let mut data_attr = DataAttributes::default();
+            for i in selected.iter() {
+                data_attr.attributes.push(item.attributes[*i].clone());
+            }
+            ret.push(data_attr);
+        }
+        ret
+    }
+
+    pub async fn delete_by_closure(
+        &self,
+        attr_pos: usize,
+        att_clone: &DataAttribute,
+        comparison: fn(&DataAttribute, &DataAttribute) -> bool,
+    ) {
+        self.data.write().await.retain(|item| !comparison(&item.attributes[attr_pos], &att_clone));
+    }
+
+    pub async fn delete_by_id(&self, attr_pos: usize, id: i64) {
+        let mut chunk_lock = self.data.write().await;
+        let index =
+            chunk_lock.iter().position(|item| item.attributes[attr_pos] == DataAttribute::Id(id));
+        if let Some(val) = index {
+            chunk_lock.remove(val);
+        }
+    }
+
+    pub async fn get_by_id(
+        &self,
+        attr_pos: usize,
+        id: i64,
+        selected: Vec<usize>,
+    ) -> Vec<DataAttributes> {
+        let chunk_lock = self.data.read().await;
+        let item = chunk_lock.iter().find(|i| i.attributes[attr_pos] == DataAttribute::Id(id));
+        if item.is_none() {
+            return vec![];
+        }
+        let item = item.unwrap();
+        let mut attributes = DataAttributes { attributes: vec![] };
+        for i in selected {
+            attributes.attributes.push(item.attributes[i].clone());
+        }
+        vec![attributes]
+    }
+
+    pub async fn add(&self, data: DataAttributes) {
+        let mut write_lock = self.data.write().await;
+        write_lock.push(data);
+    }
 }
 
 pub struct TableData {
-    pub chunks: [TableDataChunk; 256],
+    pub chunks: [Arc<TableDataChunk>; 256],
     pub counter: RelaxedCounter,
 }
 
@@ -82,8 +150,8 @@ pub struct Database {
     pub data: Arc<RwLock<HashMap<String, TableData>>>,
 }
 
-fn new_tabledata() -> [TableDataChunk; 256] {
-    (0..256).map(|_| TableDataChunk::default()).collect::<Vec<_>>().try_into().unwrap()
+fn new_tabledata() -> [Arc<TableDataChunk>; 256] {
+    (0..256).map(|_| Arc::<TableDataChunk>::default()).collect::<Vec<_>>().try_into().unwrap()
 }
 
 impl TableData {
@@ -93,8 +161,8 @@ impl TableData {
             *id = DataAttribute::Id(current_id);
         }
         let chunk_num = hash_id(current_id);
-        let mut write_lock = self.chunks[chunk_num].data.write().await;
-        write_lock.push(data);
+        self.chunks[chunk_num].add(data).await;
+
         current_id
     }
 
@@ -102,15 +170,15 @@ impl TableData {
         &self,
         attr_pos: usize,
         att: &DataAttribute,
-        closure: fn(&DataAttribute, &DataAttribute) -> bool,
+        comparison: fn(&DataAttribute, &DataAttribute) -> bool,
     ) {
         // All chunks are handled asynchronously
         let mut futures_vec = vec![];
         for i in 0..256usize {
-            let data = self.chunks[i].data.clone();
+            let chunk = self.chunks[i].clone();
             let att_clone = (*att).clone();
             futures_vec.push(tokio::spawn(async move {
-                data.write().await.retain(|item| !closure(&item.attributes[attr_pos], &att_clone));
+                chunk.delete_by_closure(attr_pos, &att_clone, comparison).await;
             }));
         }
         for handle in futures_vec {
@@ -123,29 +191,16 @@ impl TableData {
         attr_pos: usize,
         att: &DataAttribute,
         selected: Vec<usize>,
-        closure: fn(&DataAttribute, &DataAttribute) -> bool,
+        comparison: fn(&DataAttribute, &DataAttribute) -> bool,
     ) -> Vec<DataAttributes> {
         let selected = Arc::new(selected);
         let mut futures_vec = vec![];
         for i in 0..256usize {
-            let data = self.chunks[i].data.clone();
             let att_clone = (*att).clone();
             let selected = selected.clone();
+            let chunk = self.chunks[i].clone();
             let future = async move {
-                let mut ret = vec![];
-                for item in data
-                    .read()
-                    .await
-                    .iter()
-                    .filter(|elem| closure(&elem.attributes[attr_pos], &att_clone))
-                {
-                    let mut data_attr = DataAttributes::default();
-                    for i in selected.iter() {
-                        data_attr.attributes.push(item.attributes[*i].clone());
-                    }
-                    ret.push(data_attr);
-                }
-                ret
+                chunk.select_by_closure(attr_pos, &att_clone, selected, comparison).await
             };
             futures_vec.push(tokio::spawn(future));
         }
@@ -201,12 +256,7 @@ impl TableData {
     async fn delete_id(&self, attr_pos: usize, id: i64) {
         let chunk_id = hash_id(id);
         let chunk = &self.chunks[chunk_id];
-        let mut chunk_lock = chunk.data.write().await;
-        let index =
-            chunk_lock.iter().position(|item| item.attributes[attr_pos] == DataAttribute::Id(id));
-        if let Some(val) = index {
-            chunk_lock.remove(val);
-        }
+        chunk.delete_by_id(attr_pos, id).await;
     }
 
     async fn get_by_id(
@@ -216,18 +266,7 @@ impl TableData {
         selected: Vec<usize>,
     ) -> Vec<DataAttributes> {
         let chunk_id = hash_id(id);
-        let chunk = &self.chunks[chunk_id];
-        let chunk_lock = chunk.data.read().await;
-        let item = chunk_lock.iter().find(|i| i.attributes[attr_pos] == DataAttribute::Id(id));
-        if item.is_none() {
-            return vec![];
-        }
-        let item = item.unwrap();
-        let mut attributes = DataAttributes { attributes: vec![] };
-        for i in selected {
-            attributes.attributes.push(item.attributes[i].clone());
-        }
-        vec![attributes]
+        self.chunks[chunk_id].get_by_id(attr_pos, id, selected).await
     }
 }
 
