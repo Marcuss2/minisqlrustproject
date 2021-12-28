@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::{HashMap, BTreeMap}, sync::Arc};
 
 use atomic_counter::{AtomicCounter, RelaxedCounter};
 use tokio::{join, sync::RwLock};
@@ -58,7 +58,7 @@ pub enum DatabaseResponse {
 
 #[derive(Default, Debug)]
 pub struct TableDataChunk {
-    data: RwLock<Vec<DataAttributes>>,
+    data: RwLock<BTreeMap<i64, DataAttributes>>,
 }
 
 impl TableDataChunk {
@@ -74,7 +74,7 @@ impl TableDataChunk {
             .data
             .read()
             .await
-            .iter()
+            .values()
             .filter(|elem| comparison(&elem.attributes[attr_pos], &att_clone))
         {
             let mut data_attr = DataAttributes::default();
@@ -92,26 +92,21 @@ impl TableDataChunk {
         att_clone: &DataAttribute,
         comparison: fn(&DataAttribute, &DataAttribute) -> bool,
     ) {
-        self.data.write().await.retain(|item| !comparison(&item.attributes[attr_pos], &att_clone));
+        self.data.write().await.retain(|_, item| !comparison(&item.attributes[attr_pos], &att_clone));
     }
 
     pub async fn delete_by_id(&self, attr_pos: usize, id: i64) {
         let mut chunk_lock = self.data.write().await;
-        let index =
-            chunk_lock.iter().position(|item| item.attributes[attr_pos] == DataAttribute::Id(id));
-        if let Some(val) = index {
-            chunk_lock.remove(val);
-        }
+        chunk_lock.remove(&id);
     }
 
     pub async fn get_by_id(
         &self,
-        attr_pos: usize,
         id: i64,
         selected: Vec<usize>,
     ) -> Vec<DataAttributes> {
         let chunk_lock = self.data.read().await;
-        let item = chunk_lock.iter().find(|i| i.attributes[attr_pos] == DataAttribute::Id(id));
+        let item = chunk_lock.get(&id);
         if item.is_none() {
             return vec![];
         }
@@ -123,9 +118,9 @@ impl TableDataChunk {
         vec![attributes]
     }
 
-    pub async fn add(&self, data: DataAttributes) {
+    pub async fn add(&self, id: i64, data: DataAttributes) {
         let mut write_lock = self.data.write().await;
-        write_lock.push(data);
+        write_lock.insert(id, data);
     }
 }
 
@@ -161,7 +156,7 @@ impl TableData {
             *id = DataAttribute::Id(current_id);
         }
         let chunk_num = hash_id(current_id);
-        self.chunks[chunk_num].add(data).await;
+        self.chunks[chunk_num].add(current_id, data).await;
 
         current_id
     }
@@ -262,11 +257,10 @@ impl TableData {
     async fn get_by_id(
         &self,
         id: i64,
-        attr_pos: usize,
         selected: Vec<usize>,
     ) -> Vec<DataAttributes> {
         let chunk_id = hash_id(id);
-        self.chunks[chunk_id].get_by_id(attr_pos, id, selected).await
+        self.chunks[chunk_id].get_by_id(id, selected).await
     }
 }
 
@@ -360,7 +354,7 @@ impl Database {
         if is_id && Self::is_eq_comparison(comparison) {
             if let Comparison::Equal(DataAttribute::Id(id)) = comparison {
                 return Ok(DatabaseResponse::Data(
-                    db_data.get_by_id(*id, attr_pos, selected).await,
+                    db_data.get_by_id(*id, selected).await,
                 ));
             } else {
                 panic!("DataAttribute was not Id");
