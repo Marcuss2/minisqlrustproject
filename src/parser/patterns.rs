@@ -49,7 +49,7 @@ macro_rules! insert_pattern {
             "(INTO)",
             captured!(string_or_ident_pattern!()),
             "(VALUES)",
-            commas!(captured!(value_pattern!()))
+            maybe_s_delimited!(r"\(", commas!(captured!(value_pattern!())), r"\)")
         )
     };
 }
@@ -105,6 +105,15 @@ mod tests {
     }
 
     #[test]
+    fn test_select_wildcard() {
+        assert_pattern(
+            select_pattern!(),
+            "select * from c",
+            &["select", "*", "from", "c"],
+        )
+    }
+
+    #[test]
     fn test_create_table() {
         assert_pattern(
             create_table_pattern!(),
@@ -119,6 +128,24 @@ mod tests {
             create_index_pattern!(),
             "create index ab_ix on t (a, b)",
             &["create", "index", "ab_ix", "on", "t", "a", "b"],
+        )
+    }
+
+    #[test]
+    fn test_insert() {
+        assert_pattern(
+            insert_pattern!(),
+            "insert into t values (NULL, 3)",
+            &["insert", "into", "t", "values", "NULL", "3"],
+        )
+    }
+
+    #[test]
+    fn test_delete() {
+        assert_pattern(
+            delete_pattern!(),
+            "delete from t where id=3",
+            &["delete", "from", "t", "where", "id", "=", "3"],
         )
     }
 
