@@ -31,8 +31,15 @@ pub fn parse_values(
             .zip(table.attributes.iter())
             .map(|(val, attr)| {
                 Ok(match attr.attribute_type {
+                    AttributeType::Id => {
+                        if *val != "null" {
+                            DataAttribute::Id(parse_i64(val)?)
+                        } else {
+                            return Err(UserError::Other("Bad type"));
+                        }
+                    }
+                    _ if *val == "null" => DataAttribute::None,
                     AttributeType::String => DataAttribute::String(parse_string(val)?.to_owned()),
-                    AttributeType::Id => DataAttribute::Id(parse_i64(val)?),
                     AttributeType::Number => DataAttribute::Number(parse_i64(val)?),
                     AttributeType::Data => unimplemented!(),
                 })
@@ -100,7 +107,9 @@ pub enum CmpTerm<'a> {
 }
 
 pub fn parse_comparison_term<'a>(term: &'a str) -> CmpTerm<'a> {
-    if term.starts_with('\'') && term.ends_with('\'') {
+    if term == "null" {
+        CmpTerm::Val(DataAttribute::None)
+    } else if term.starts_with('\'') && term.ends_with('\'') {
         CmpTerm::Val(DataAttribute::String(parse_string(term).unwrap().to_owned()))
     } else if term.starts_with('"') && term.ends_with('"') {
         CmpTerm::Ident(parse_string(term).unwrap())

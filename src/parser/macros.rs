@@ -1,6 +1,6 @@
 macro_rules! value_pattern {
     () => {
-        concat!(r"\d+|", string_pattern!())
+        unite!(r"\d+", "NULL", string_pattern!())
     };
 }
 
@@ -24,7 +24,7 @@ macro_rules! string_or_ident_pattern {
 
 macro_rules! value_or_ident_pattern {
     () => {
-        concat!(r"\d+|", string_or_ident_pattern!())
+        unite!(r"\d+", "NULL", string_or_ident_pattern!())
     };
 }
 
