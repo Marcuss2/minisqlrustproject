@@ -16,7 +16,7 @@ pub enum Command {
     Drop { name: String },
 }
 
-pub async fn parse(
+pub async fn get_command(
     input: &str,
     tables: Arc<RwLock<HashMap<String, DatabaseTable>>>,
 ) -> Result<Command, ParseError> {
