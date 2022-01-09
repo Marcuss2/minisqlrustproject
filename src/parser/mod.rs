@@ -6,7 +6,7 @@ use self::patterns::capture_command;
 use self::utils::*;
 use crate::{
     database::{Attribute, Comparison, DataAttributes, DatabaseTable},
-    error::ParseError,
+    error::UserError,
 };
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
@@ -25,7 +25,7 @@ const QUOTES: &[char] = &['\'', '"'];
 pub async fn get_command(
     input: &str,
     tables: Arc<RwLock<HashMap<String, DatabaseTable>>>,
-) -> Result<Command, ParseError> {
+) -> Result<Command, UserError> {
     let lowercased = capture_command(input)
         .into_iter()
         .map(|s| if s.starts_with(QUOTES) { s.to_owned() } else { s.to_ascii_lowercase() })
@@ -38,13 +38,13 @@ pub async fn get_command(
         ["create", "index", _index, "on", _table, _cols @ ..] => todo!(),
         ["select", cols @ .., "from", table] => make_select_command(
             table,
-            tables.read().await.get(*table).ok_or(ParseError::SyntaxError)?,
+            tables.read().await.get(*table).ok_or(UserError::Other("No such table"))?,
             cols,
             None,
         )?,
         ["select", cols @ .., "from", table, "where", a, cmp, b] => make_select_command(
             table,
-            tables.read().await.get(*table).ok_or(ParseError::SyntaxError)?,
+            tables.read().await.get(*table).ok_or(UserError::Other("No such table"))?,
             cols,
             Some((a, cmp, b)),
         )?,
@@ -53,7 +53,7 @@ pub async fn get_command(
             data: DataAttributes {
                 attributes: parse_values(
                     values,
-                    tables.read().await.get(*table).ok_or(ParseError::SyntaxError)?,
+                    tables.read().await.get(*table).ok_or(UserError::Other("No such table"))?,
                 )?,
             },
         },
@@ -62,12 +62,12 @@ pub async fn get_command(
                 a,
                 cmp,
                 b,
-                tables.read().await.get(*table).ok_or(ParseError::SyntaxError)?,
+                tables.read().await.get(*table).ok_or(UserError::Other("No such table"))?,
             )?;
             Command::Delete { table_name: table.to_string(), attr_pos, comparison }
         }
         ["drop", "table", table] => Command::Drop { name: table.to_string() },
-        [] => return Err(ParseError::SyntaxError),
+        [] => return Err(UserError::SyntaxError),
         _ => unreachable!(),
     };
     Ok(command)
@@ -78,7 +78,7 @@ fn make_select_command(
     table: &DatabaseTable,
     cols: &[&str],
     where_clause: Option<(&str, &str, &str)>,
-) -> Result<Command, ParseError> {
+) -> Result<Command, UserError> {
     let table_name = table_name.to_owned();
     let selected = parse_selected(cols, table)?;
     if let Some((lhs, cmp, rhs)) = where_clause {

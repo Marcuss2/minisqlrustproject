@@ -1,6 +1,6 @@
 use crate::{
     database::{Attribute, AttributeType, Comparison, DataAttribute, DatabaseTable},
-    error::ParseError,
+    error::UserError,
 };
 use std::collections::HashMap;
 
@@ -8,21 +8,23 @@ pub fn get_col_to_ix_map(table: &DatabaseTable) -> HashMap<&str, usize> {
     table.attributes.iter().enumerate().map(|(ix, attr)| (attr.name.as_str(), ix)).collect()
 }
 
-pub fn parse_selected(cols: &[&str], table: &DatabaseTable) -> Result<Vec<usize>, ParseError> {
+pub fn parse_selected(cols: &[&str], table: &DatabaseTable) -> Result<Vec<usize>, UserError> {
     if cols == ["*"] {
         Ok((0..table.attributes.len()).collect())
     } else {
         let indices = get_col_to_ix_map(table);
-        cols.iter().map(|col| indices.get(col).copied().ok_or(ParseError::SyntaxError)).collect()
+        cols.iter()
+            .map(|col| indices.get(col).copied().ok_or(UserError::Other("Column not found")))
+            .collect()
     }
 }
 
 pub fn parse_values(
     values: &[&str],
     table: &DatabaseTable,
-) -> Result<Vec<DataAttribute>, ParseError> {
+) -> Result<Vec<DataAttribute>, UserError> {
     if values.len() > table.attributes.len() {
-        Err(ParseError::SyntaxError)
+        Err(UserError::Other("Too many values"))
     } else {
         values
             .iter()
@@ -39,8 +41,8 @@ pub fn parse_values(
     }
 }
 
-pub fn parse_i64(val: &str) -> Result<i64, ParseError> {
-    val.parse().map_err(|_| ParseError::SyntaxError)
+pub fn parse_i64(val: &str) -> Result<i64, UserError> {
+    val.parse().map_err(|_| UserError::SyntaxError)
 }
 
 pub fn parse_comparison(
@@ -48,7 +50,7 @@ pub fn parse_comparison(
     cmp: &str,
     rhs: &str,
     table: &DatabaseTable,
-) -> Result<(usize, Comparison), ParseError> {
+) -> Result<(usize, Comparison), UserError> {
     let terms = [lhs, rhs].map(parse_comparison_term);
     let flipped = matches!(terms[0], CmpTerm::Val(_));
     let (attr_pos, data_attr) = match terms {
@@ -60,7 +62,11 @@ pub fn parse_comparison(
             };
             (attr_pos, val)
         }
-        _ => return Err(ParseError::SyntaxError),
+        _ => {
+            return Err(UserError::Other(
+                "Only single column against literal comparisons supported",
+            ))
+        }
     };
     let cmp = match (cmp, flipped) {
         (">", false) | ("<", true) => Comparison::Higher(data_attr),
@@ -73,7 +79,7 @@ pub fn parse_comparison(
     Ok((attr_pos, cmp))
 }
 
-pub fn describe_col(col: &str, table: &DatabaseTable) -> Result<(usize, bool), ParseError> {
+pub fn describe_col(col: &str, table: &DatabaseTable) -> Result<(usize, bool), UserError> {
     table
         .attributes
         .iter()
@@ -85,7 +91,7 @@ pub fn describe_col(col: &str, table: &DatabaseTable) -> Result<(usize, bool), P
                 None
             }
         })
-        .ok_or(ParseError::SyntaxError)
+        .ok_or(UserError::Other("Column not found"))
 }
 
 pub enum CmpTerm<'a> {
@@ -105,17 +111,17 @@ pub fn parse_comparison_term<'a>(term: &'a str) -> CmpTerm<'a> {
     }
 }
 
-pub fn parse_string(val: &str) -> Result<&str, ParseError> {
+pub fn parse_string(val: &str) -> Result<&str, UserError> {
     if (val.starts_with('\'') && val.ends_with('\''))
         || (val.starts_with('"') && val.ends_with('"'))
     {
         Ok(&val[1..val.len() - 1])
     } else {
-        Err(ParseError::SyntaxError)
+        Err(UserError::SyntaxError)
     }
 }
 
-pub fn parse_attr_type(attr_type: &str) -> Result<AttributeType, ParseError> {
+pub fn parse_attr_type(attr_type: &str) -> Result<AttributeType, UserError> {
     let (type_name, is_pk) = if let Some(ix) = attr_type.find("primary key") {
         (&attr_type[..ix - 1], true)
     } else {
@@ -123,14 +129,14 @@ pub fn parse_attr_type(attr_type: &str) -> Result<AttributeType, ParseError> {
     };
     match type_name {
         "int" | "integer" => Ok(if is_pk { AttributeType::Id } else { AttributeType::Number }),
-        _ if is_pk => Err(ParseError::SyntaxError),
+        _ if is_pk => Err(UserError::Other("Only integers supported for primary keys")),
         "string" | "varchar" | "text" => Ok(AttributeType::String),
         "data" | "blob" => Ok(AttributeType::Data),
         _ => unreachable!(),
     }
 }
 
-pub fn parse_attributes(attrs: &[&str]) -> Result<Vec<Attribute>, ParseError> {
+pub fn parse_attributes(attrs: &[&str]) -> Result<Vec<Attribute>, UserError> {
     attrs
         .chunks_exact(2)
         .map(|pair| {

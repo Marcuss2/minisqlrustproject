@@ -30,21 +30,23 @@ impl Error for DatabaseError {}
 
 #[non_exhaustive]
 #[derive(Debug)]
-pub enum ParseError {
+pub enum UserError {
     SyntaxError,
+    Other(&'static str)
 }
 
-impl Display for ParseError {
+impl Display for UserError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let message = match self {
-            ParseError::SyntaxError => "SyntaxError",
+        let message = match &self {
+            UserError::SyntaxError => "SyntaxError",
+            UserError::Other(msg) => msg,
             _ => "Unknown error",
         };
-        f.write_str(message)
+        write!(f, "UserError: {}", message)
     }
 }
 
-impl Error for ParseError {
+impl Error for UserError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         None
     }
