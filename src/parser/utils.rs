@@ -107,7 +107,7 @@ pub enum CmpTerm<'a> {
     Val(DataAttribute),
 }
 
-pub fn parse_comparison_term<'a>(term: &'a str) -> CmpTerm<'a> {
+pub fn parse_comparison_term(term: &str) -> CmpTerm<'_> {
     if term == "null" {
         CmpTerm::Val(DataAttribute::None)
     } else if term.starts_with('\'') && term.ends_with('\'') {
