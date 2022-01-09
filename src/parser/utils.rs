@@ -79,8 +79,9 @@ pub fn parse_comparison(
         (">", false) | ("<", true) => Comparison::Higher(data_attr),
         ("<", false) | (">", true) => Comparison::Lower(data_attr),
         ("=", _) => Comparison::Equal(data_attr),
-        (">=", false) | ("<=", true) => todo!(),
-        ("<=", false) | (">=", true) => todo!(),
+        ("!=" | "<>", _) => Comparison::NotEqual(data_attr),
+        (">=", false) | ("<=", true) => Comparison::HigherOrEqual(data_attr),
+        ("<=", false) | (">=", true) => Comparison::LowerOrEqual(data_attr),
         _ => unreachable!(),
     };
     Ok((attr_pos, cmp))

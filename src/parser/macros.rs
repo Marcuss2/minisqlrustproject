@@ -54,7 +54,7 @@ macro_rules! where_pattern {
         concat!(
             r"(WHERE)\s+",
             value_or_ident_group!(),
-            r"\s*(=|<|>|>=|<=)\s*",
+            r"\s*(=|<|>|>=|<=|!=|<>)\s*",
             value_or_ident_group!()
         )
     };

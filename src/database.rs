@@ -11,8 +11,11 @@ use serde::Serialize;
 pub enum Comparison {
     All,
     Higher(DataAttribute),
+    HigherOrEqual(DataAttribute),
     Lower(DataAttribute),
+    LowerOrEqual(DataAttribute),
     Equal(DataAttribute),
+    NotEqual(DataAttribute),
 }
 
 #[derive(Serialize, Debug, PartialEq, PartialOrd, Clone)]
@@ -222,6 +225,15 @@ impl TableData {
             Comparison::Equal(attr) => {
                 self.delete_closure_comp(attr_pos, attr, |num, att| *num == *att)
             }
+            Comparison::HigherOrEqual(attr) => {
+                self.delete_closure_comp(attr_pos, attr, |num, att| *num >= *att)
+            },
+            Comparison::LowerOrEqual(attr) => {
+                self.delete_closure_comp(attr_pos, attr, |num, att| *num <= *att)
+            },
+            Comparison::NotEqual(attr) => {
+                self.delete_closure_comp(attr_pos, attr, |num, att| *num != *att)
+            },
         }
         .await;
     }
@@ -245,6 +257,15 @@ impl TableData {
             Comparison::Equal(attr) => {
                 self.select_closure_comp(attr_pos, attr, selected, |num, att| *num == *att)
             }
+            Comparison::HigherOrEqual(attr) => {
+                self.select_closure_comp(attr_pos, attr, selected, |num, att| *num >= *att)
+            },
+            Comparison::LowerOrEqual(attr) => {
+                self.select_closure_comp(attr_pos, attr, selected, |num, att| *num <= *att)
+            },
+            Comparison::NotEqual(attr) => {
+                self.select_closure_comp(attr_pos, attr, selected, |num, att| *num != *att)
+            },
         }
         .await
     }
