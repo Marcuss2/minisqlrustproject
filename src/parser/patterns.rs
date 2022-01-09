@@ -85,26 +85,6 @@ fn matches_as_vec<'a>(input: &'a str, re: &Regex) -> Vec<&'a str> {
     }
 }
 
-fn lowercase_unquoted(input: &str) -> String {
-    input
-        .chars()
-        .scan((None, false), |(last_quote, escaped), c| {
-            let result = if last_quote.is_some() { c } else { c.to_ascii_lowercase() };
-            if *escaped {
-                *escaped = false;
-            } else {
-                match c {
-                    '\\' => *escaped = true,
-                    x if Some(x) == *last_quote => *last_quote = None,
-                    x @ ('"' | '\'') => *last_quote = Some(x),
-                    _ => (),
-                };
-            };
-            Some(result)
-        })
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -133,15 +113,6 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn test_case_insensitivity() {
-    //     assert_pattern(
-    //         select_pattern!(),
-    //         "SELECT A, 'B' from 'c' Where d=2",
-    //         &["select", "a", "'b'", "from", "'c'", "where"],
-    //     )
-    // }
-
     #[test]
     fn test_create_index() {
         assert_pattern(
@@ -160,13 +131,3 @@ mod tests {
         )
     }
 }
-
-// let _ = match matches_as_vec(str, &RE).as_slice() {
-//     ["create", "table", name, attrs @ ..] => todo!(),
-//     ["create", "index", col_names @ ..] => todo!(),
-//     ["select", col_names @ .., "from", table_name] => todo!(),
-//     ["select", col_names @ .., "from", table_name, "where", a, cmp, b] => todo!(),
-//     ["insert", "into", cols_and_values @ ..] =>
-//     ["delete", "from", table_name, "where", a, cmp, b] => todo!(),
-//     _ => panic!(),
-// };
