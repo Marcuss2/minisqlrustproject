@@ -38,6 +38,7 @@ pub enum AttributeType {
     Data,
 }
 
+#[derive(PartialEq)]
 pub struct Attribute {
     pub name: String,
     pub attribute_type: AttributeType,

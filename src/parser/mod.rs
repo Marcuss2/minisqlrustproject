@@ -12,6 +12,7 @@ use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 
 #[non_exhaustive]
+#[derive(PartialEq)]
 pub enum Command {
     Create { name: String, attributes: Vec<Attribute> },
     Insert { table_name: String, data: DataAttributes },
@@ -86,5 +87,26 @@ fn make_select_command(
         Ok(Command::Select { table_name, selected, comparison, attr_pos })
     } else {
         Ok(Command::Select { table_name, selected, comparison: Comparison::All, attr_pos: 0 })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::database::{AttributeType, Database};
+
+    #[tokio::test]
+    async fn parse_command() -> Result<(), UserError> {
+        let db = Database::default();
+        let command = get_command("create table x ( a int, b int primary key )", db.tables).await?;
+        let expected = Command::Create {
+            name: "x".to_string(),
+            attributes: vec![
+                Attribute { name: "a".to_string(), attribute_type: AttributeType::Number },
+                Attribute { name: "b".to_string(), attribute_type: AttributeType::Id },
+            ],
+        };
+        assert!(command == expected);
+        Ok(())
     }
 }
