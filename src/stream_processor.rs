@@ -13,7 +13,7 @@ impl StreamProcessor {
         stream.readable().await?;
         let count = stream.try_read(&mut buffer)?;
         let unparsed = std::str::from_utf8(&buffer[0..count])?;
-        let command = crate::parser::parse(unparsed, self.database.tables.clone()).await?;
+        let command = crate::parser::get_command(unparsed, self.database.tables.clone()).await?;
         let response = match command {
             crate::parser::Command::Create { name, attributes } => {
                 self.database.create_table(&name, attributes).await?
