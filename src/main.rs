@@ -4,6 +4,8 @@ use anyhow::Result;
 use dotenv::dotenv;
 use tokio::net::TcpListener;
 
+pub mod allocator;
+pub mod data;
 pub mod database;
 pub mod error;
 pub mod parser;
