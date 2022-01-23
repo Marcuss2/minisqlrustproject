@@ -1,7 +1,4 @@
-use std::{
-    error::Error,
-    fmt::{Display},
-};
+use std::{error::Error, fmt::Display};
 
 #[non_exhaustive]
 #[derive(Debug)]
@@ -19,7 +16,6 @@ impl Display for DatabaseError {
             DatabaseError::DataConflict => "Data Conflict",
             DatabaseError::TableDoesNotExist => "Table Does Not Exist",
             DatabaseError::NoDataFound => "No Data Found",
-            _ => "Unknown error",
         };
 
         f.write_str(message)
@@ -32,7 +28,7 @@ impl Error for DatabaseError {}
 #[derive(Debug)]
 pub enum UserError {
     SyntaxError,
-    Other(&'static str)
+    Other(&'static str),
 }
 
 impl Display for UserError {
@@ -40,7 +36,6 @@ impl Display for UserError {
         let message = match &self {
             UserError::SyntaxError => "SyntaxError",
             UserError::Other(msg) => msg,
-            _ => "Unknown error",
         };
         write!(f, "UserError: {}", message)
     }

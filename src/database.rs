@@ -1,11 +1,15 @@
-use std::{collections::{HashMap, BTreeMap}, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use atomic_counter::{AtomicCounter, RelaxedCounter};
-use tokio::{join, sync::RwLock};
+use tokio::{
+    join,
+    sync::{Mutex, RwLock},
+};
 
+use crate::data::{DataAbstraction, DataAbstractionLock};
 use crate::error::DatabaseError;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(PartialEq)]
 pub enum Comparison {
@@ -18,7 +22,7 @@ pub enum Comparison {
     NotEqual(DataAttribute),
 }
 
-#[derive(Serialize, Debug, PartialEq, PartialOrd, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Clone)]
 pub enum DataAttribute {
     String(String),
     Number(i64),
@@ -28,7 +32,7 @@ pub enum DataAttribute {
     None,
 }
 
-#[derive(Serialize, Debug, Default, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
 pub struct DataAttributes {
     pub attributes: Vec<DataAttribute>,
 }
@@ -62,10 +66,15 @@ pub enum DatabaseResponse {
 
 #[derive(Default, Debug)]
 pub struct TableDataChunk {
-    data: RwLock<BTreeMap<i64, DataAttributes>>,
+    data: Mutex<DataAbstraction>,
 }
 
 impl TableDataChunk {
+    #[allow(clippy::needless_lifetimes)]
+    pub async fn lock_data<'a>(&'a self) -> DataAbstractionLock<'a> {
+        DataAbstractionLock::new(self.data.lock().await)
+    }
+
     pub async fn select_by_closure(
         &self,
         attr_pos: usize,
@@ -74,13 +83,8 @@ impl TableDataChunk {
         comparison: fn(&DataAttribute, &DataAttribute) -> bool,
     ) -> Vec<DataAttributes> {
         let mut ret = vec![];
-        for item in self
-            .data
-            .read()
-            .await
-            .values()
-            .filter(|elem| comparison(&elem.attributes[attr_pos], &att_clone))
-        {
+        let lock = self.lock_data().await;
+        for item in lock.values().filter(|elem| comparison(&elem.attributes[attr_pos], att_clone)) {
             let mut data_attr = DataAttributes::default();
             for i in selected.iter() {
                 data_attr.attributes.push(item.attributes[*i].clone());
@@ -96,21 +100,17 @@ impl TableDataChunk {
         att_clone: &DataAttribute,
         comparison: fn(&DataAttribute, &DataAttribute) -> bool,
     ) {
-        self.data.write().await.retain(|_, item| !comparison(&item.attributes[attr_pos], &att_clone));
+        self.lock_data().await.retain(|_, item| !comparison(&item.attributes[attr_pos], att_clone));
     }
 
-    pub async fn delete_by_id(&self, attr_pos: usize, id: i64) {
-        let mut chunk_lock = self.data.write().await;
-        chunk_lock.remove(&id);
+    pub async fn delete_by_id(&self, id: i64) {
+        let mut lock = self.lock_data().await;
+        lock.remove(&id);
     }
 
-    pub async fn get_by_id(
-        &self,
-        id: i64,
-        selected: Vec<usize>,
-    ) -> Vec<DataAttributes> {
-        let chunk_lock = self.data.read().await;
-        let item = chunk_lock.get(&id);
+    pub async fn get_by_id(&self, id: i64, selected: Vec<usize>) -> Vec<DataAttributes> {
+        let lock = self.lock_data().await;
+        let item = lock.get(&id);
         if item.is_none() {
             return vec![];
         }
@@ -123,8 +123,8 @@ impl TableDataChunk {
     }
 
     pub async fn add(&self, id: i64, data: DataAttributes) {
-        let mut write_lock = self.data.write().await;
-        write_lock.insert(id, data);
+        let mut lock = self.lock_data().await;
+        lock.insert(id, data);
     }
 }
 
@@ -227,13 +227,13 @@ impl TableData {
             }
             Comparison::HigherOrEqual(attr) => {
                 self.delete_closure_comp(attr_pos, attr, |num, att| *num >= *att)
-            },
+            }
             Comparison::LowerOrEqual(attr) => {
                 self.delete_closure_comp(attr_pos, attr, |num, att| *num <= *att)
-            },
+            }
             Comparison::NotEqual(attr) => {
                 self.delete_closure_comp(attr_pos, attr, |num, att| *num != *att)
-            },
+            }
         }
         .await;
     }
@@ -259,28 +259,24 @@ impl TableData {
             }
             Comparison::HigherOrEqual(attr) => {
                 self.select_closure_comp(attr_pos, attr, selected, |num, att| *num >= *att)
-            },
+            }
             Comparison::LowerOrEqual(attr) => {
                 self.select_closure_comp(attr_pos, attr, selected, |num, att| *num <= *att)
-            },
+            }
             Comparison::NotEqual(attr) => {
                 self.select_closure_comp(attr_pos, attr, selected, |num, att| *num != *att)
-            },
+            }
         }
         .await
     }
 
-    async fn delete_id(&self, attr_pos: usize, id: i64) {
+    async fn delete_id(&self, id: i64) {
         let chunk_id = hash_id(id);
         let chunk = &self.chunks[chunk_id];
-        chunk.delete_by_id(attr_pos, id).await;
+        chunk.delete_by_id(id).await;
     }
 
-    async fn get_by_id(
-        &self,
-        id: i64,
-        selected: Vec<usize>,
-    ) -> Vec<DataAttributes> {
+    async fn get_by_id(&self, id: i64, selected: Vec<usize>) -> Vec<DataAttributes> {
         let chunk_id = hash_id(id);
         self.chunks[chunk_id].get_by_id(id, selected).await
     }
@@ -349,7 +345,7 @@ impl Database {
         let db_data = db_data.unwrap();
         if is_id && Self::is_eq_comparison(comparison) {
             if let Comparison::Equal(DataAttribute::Id(id)) = comparison {
-                db_data.delete_id(attr_pos, *id).await;
+                db_data.delete_id(*id).await;
             } else {
                 panic!("DataAttribute was not Id");
             }
@@ -375,9 +371,7 @@ impl Database {
         let db_data = db_data.unwrap();
         if is_id && Self::is_eq_comparison(comparison) {
             if let Comparison::Equal(DataAttribute::Id(id)) = comparison {
-                return Ok(DatabaseResponse::Data(
-                    db_data.get_by_id(*id, selected).await,
-                ));
+                return Ok(DatabaseResponse::Data(db_data.get_by_id(*id, selected).await));
             } else {
                 panic!("DataAttribute was not Id");
             }

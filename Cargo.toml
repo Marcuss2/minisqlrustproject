@@ -1,7 +1,11 @@
 [package]
 name = "minisql"
 version = "0.1.0"
-authors = ["Marek Vrbka <469025@mail.muni.cz>", "Peter Jaško <xjasko2@fi.muni.cz>"]
+authors = [
+    "Marek Vrbka <469025@mail.muni.cz>",
+    "Peter Jaško <xjasko2@fi.muni.cz>",
+    "Hugo Adamove <492982@mail.muni.cz>",
+]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -11,7 +15,9 @@ anyhow = "1.0"
 tokio = { version = "1", features = ["full"] }
 dotenv = "0.15.0"
 serde = { version = "1.0.130", features = ["derive"] }
+serde_json = "1.0.74"
 ron = "0.7"
 atomic-counter = "1.0.1"
 regex = "1"
 lazy_static = "1.4"
+cap = "0.1"
