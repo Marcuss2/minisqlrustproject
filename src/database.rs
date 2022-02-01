@@ -465,4 +465,25 @@ mod tests {
             panic!();
         }
     }
+
+    #[tokio::test]
+    async fn empty_string() {
+        let db = fill_db().await;
+        let mut add_data = DataAttributes::default();
+        add_data.attributes.push(DataAttribute::NoneId);
+        add_data.attributes.push(DataAttribute::String("".to_string()));
+        add_data.attributes.push(DataAttribute::Number(123));
+        add_data.attributes.push(DataAttribute::Data(vec![9, 2, 1]));
+        assert!(db.insert("people", add_data).await.is_ok());
+        let selected = vec![1, 2, 3];
+        let empty_data_string = DataAttribute::String("".to_string());
+        let res = db.select("people", 1, &Comparison::Equal(empty_data_string), selected).await.expect("Select by empty string failed");
+        if let DatabaseResponse::Data(data) = res {
+            let empty_person = &data[0].attributes;
+            assert_eq!(empty_person[0], DataAttribute::String("".to_string()));
+            assert_eq!(empty_person[1], DataAttribute::Number(123));
+            assert_eq!(empty_person[2], DataAttribute::Data(vec![9, 2, 1]));
+
+        }
+    }
 }
