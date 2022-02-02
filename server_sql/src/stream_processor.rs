@@ -1,6 +1,11 @@
 use crate::database::Database;
 use ron::ser::to_string;
-use tokio::net::TcpStream;
+
+use client_sql::Command as Action;
+use tokio::{
+    io::{self, AsyncReadExt, AsyncWriteExt},
+    net::{TcpListener, TcpStream},
+};
 
 #[derive(Default)]
 pub struct StreamProcessor {
@@ -8,12 +13,11 @@ pub struct StreamProcessor {
 }
 
 impl StreamProcessor {
-    pub async fn process_stream(&self, stream: TcpStream) -> anyhow::Result<()> {
-        let mut buffer = [0u8; 1024];
-        stream.readable().await?;
-        let count = stream.try_read(&mut buffer)?;
-        let unparsed = std::str::from_utf8(&buffer[0..count])?;
-        let command = crate::parser::get_command(unparsed, self.database.tables.clone()).await?;
+    pub async fn process_str(&self, str_command: String) -> anyhow::Result<String> {
+        let deserialized: Action = serde_json::from_str(&str_command).unwrap();
+
+        //get_command should be getting Action i quess (Command from client_sql lib)
+        let command = crate::parser::get_command(&deserialized.contents, self.database.tables.clone()).await?;
         let response = match command {
             crate::parser::Command::Create { name, attributes } => {
                 self.database.create_table(&name, attributes).await?
@@ -30,7 +34,6 @@ impl StreamProcessor {
             crate::parser::Command::Drop { name } => self.database.drop_table(&name).await?,
         };
         let res = to_string(&response)?;
-        stream.try_write(res.as_bytes())?;
-        Ok(())
+        Ok(res)
     }
 }
