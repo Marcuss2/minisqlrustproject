@@ -11,3 +11,5 @@ target/
 
 # db files
 .db_data/
+
+.idea

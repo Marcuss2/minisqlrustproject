@@ -10,14 +10,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="894d77b0-c621-4287-86c5-390dcf6aa6b0" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/server_sql/database/test123/second" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/minisql.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/minisql.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Cargo.lock" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/client_sql/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/client_sql/src/main.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/server_sql/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/server_sql/Cargo.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/server_sql/src/index.rs" beforeDir="false" afterPath="$PROJECT_DIR$/server_sql/src/index.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/server_sql/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/server_sql/src/main.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/server_sql/src/stream_processor.rs" beforeDir="false" afterPath="$PROJECT_DIR$/server_sql/src/stream_processor.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -62,9 +56,9 @@
     <property name="org.rust.disableDetachedFileInspectionC:/Users/Pavel/CLionProjects/Rust/minisql/client_sql/src/main.rs" value="true" />
   </component>
   <component name="RunManager">
-    <configuration default="true" type="GradleAppRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" PASS_PARENT_ENVS_2="true">
+    <configuration default="true" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" PASS_PARENT_ENVS_2="true">
       <method v="2">
-        <option name="com.jetbrains.cidr.cpp.gradle.execution.GradleNativeBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
       </method>
     </configuration>
   </component>
@@ -86,7 +80,8 @@
       <workItem from="1643375297631" duration="3962000" />
       <workItem from="1643379326784" duration="616000" />
       <workItem from="1643379969292" duration="10094000" />
-      <workItem from="1643717225557" duration="11855000" />
+      <workItem from="1643717225557" duration="12006000" />
+      <workItem from="1643839227892" duration="1791000" />
     </task>
     <servers />
   </component>

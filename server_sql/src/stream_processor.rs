@@ -2,6 +2,7 @@ use crate::database::Database;
 use ron::ser::to_string;
 
 use client_sql::Command as Action;
+use client_sql::CommandType;
 
 #[derive(Default)]
 pub struct StreamProcessor {
@@ -12,7 +13,15 @@ impl StreamProcessor {
     pub async fn process_str(&self, str_command: String) -> anyhow::Result<String> {
         let deserialized: Action = serde_json::from_str(&str_command).unwrap();
 
-        // get_command should be getting Action i quess (Command from client_sql lib)
+        match &deserialized.cmd{
+            CommandType::Tables => {
+                return Ok(format!("{:?}", self.database.tables().await?));
+            },
+            CommandType::Columns => {
+                return Ok(format!("{:?}", self.database.table_attributes(&deserialized.contents).await?));
+            }
+            _ => {},
+        };
         let command =
             crate::parser::get_command(&deserialized.contents, self.database.tables.clone())
                 .await?;
