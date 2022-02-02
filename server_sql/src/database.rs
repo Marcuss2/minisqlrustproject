@@ -62,6 +62,7 @@ pub enum DatabaseResponse {
     Nothing,
     Id(i64),
     Data(Vec<DataAttributes>),
+    Names(Vec<String>),
 }
 
 #[derive(Default, Debug)]
@@ -383,6 +384,21 @@ impl Database {
         self.tables.write().await.remove(table_name);
         self.data.write().await.remove(table_name);
         Ok(DatabaseResponse::Nothing)
+    }
+
+    pub async fn tables(&self) -> Result<DatabaseResponse, DatabaseError> {
+        let tables = self.tables.read().await.keys().map(|k| k.clone()).collect();
+        Ok(DatabaseResponse::Names(tables))
+    }
+
+    pub async fn table_attributes(&self, name: &str) -> Result<DatabaseResponse, DatabaseError> {
+        let tables = self.tables.read().await;
+        if let Some(table) = tables.get(name) {
+            return Ok(DatabaseResponse::Names(
+                table.attributes.iter().map(|att| att.name.clone()).collect(),
+            ));
+        }
+        Err(DatabaseError::TableDoesNotExist)
     }
 }
 
