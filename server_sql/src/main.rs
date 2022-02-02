@@ -21,7 +21,7 @@ async fn main() -> io::Result<()> {
     dotenv().ok();
 
     //let url = std::env::var("BIND_URL").expect("BIND_URL must be set");
-    let listener = TcpListener::bind("127.0.0.1:8000").await?;
+    let listener = TcpListener::bind("0.0.0.0:8000").await?;
     let stream_processor = Arc::new(stream_processor::StreamProcessor::default());
     loop {
         let (mut stream, _) = listener.accept().await?;

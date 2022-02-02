@@ -65,7 +65,7 @@ fn read_input() -> Result<String, other_io::Error> {
 }
 
 async fn connect_to_server() -> io::Result<TcpStream> {
-    let addr = "127.0.0.1:8000".parse().unwrap();
+    let addr = std::env::var("SERVER_IP").unwrap_or("127.0.0.1".to_string()).parse().unwrap();
 
     let socket = TcpSocket::new_v4()?;
     let stream = socket.connect(addr).await?;
