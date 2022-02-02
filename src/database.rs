@@ -392,6 +392,11 @@ mod tests {
 
     use super::{Attribute, AttributeType, Comparison, Database};
 
+    use rand::distributions::Alphanumeric;
+    use rand::prelude::*;
+    use rand::Rng;
+    use rand_pcg::{Lcg128Xsl64, Pcg64};
+
     async fn fill_db() -> Database {
         let db = Database::default();
         let mut attributes = vec![];
@@ -477,13 +482,98 @@ mod tests {
         assert!(db.insert("people", add_data).await.is_ok());
         let selected = vec![1, 2, 3];
         let empty_data_string = DataAttribute::String("".to_string());
-        let res = db.select("people", 1, &Comparison::Equal(empty_data_string), selected).await.expect("Select by empty string failed");
+        let res = db
+            .select("people", 1, &Comparison::Equal(empty_data_string), selected)
+            .await
+            .expect("Select by empty string failed");
         if let DatabaseResponse::Data(data) = res {
             let empty_person = &data[0].attributes;
             assert_eq!(empty_person[0], DataAttribute::String("".to_string()));
             assert_eq!(empty_person[1], DataAttribute::Number(123));
             assert_eq!(empty_person[2], DataAttribute::Data(vec![9, 2, 1]));
-
         }
+    }
+
+    async fn add_random_entry(db: &mut Database, rng: &mut Lcg128Xsl64) -> DataAttributes {
+        let mut add_data = DataAttributes::default();
+        add_data.attributes.push(DataAttribute::NoneId);
+        let rng_copy = rng.clone();
+        let rand_string = rng_copy.sample_iter(&Alphanumeric).take(30).map(char::from).collect();
+        add_data.attributes.push(DataAttribute::String(rand_string));
+        rng.advance(4);
+        let num = rng.gen();
+        add_data.attributes.push(DataAttribute::Number(num));
+        add_data.attributes.push(DataAttribute::Data((0..64).map(|_| rng.gen()).collect()));
+        let mut copied_data = add_data.clone();
+        let id = db.insert("people", add_data).await.unwrap();
+        if let DatabaseResponse::Id(id) = id {
+            copied_data.attributes[0] = DataAttribute::Id(id);
+        }
+        copied_data
+    }
+
+    async fn test_random_value(
+        db: &mut Database,
+        rng: &mut Lcg128Xsl64,
+        dataset: &Vec<DataAttributes>,
+    ) {
+        let index = rng.gen_range(0..dataset.len());
+        let tested_value = &dataset[index];
+        let selected = vec![0, 1, 2, 3];
+        let res = db
+            .select("people", 0, &Comparison::Equal(tested_value.attributes[0].clone()), selected)
+            .await
+            .expect(&format!("Expected data not found {:?}", tested_value));
+        if let DatabaseResponse::Data(data) = res {
+            assert_eq!(tested_value, &data[0]);
+        } else {
+            panic!();
+        }
+    }
+
+    async fn delete_random_value(
+        db: &mut Database,
+        rng: &mut Lcg128Xsl64,
+        dataset: &mut Vec<DataAttributes>,
+    ) {
+        let index = rng.gen_range(0..dataset.len());
+        let id = dataset[index].attributes[0].clone();
+        db.delete("people", 0, &Comparison::Equal(id.clone()))
+            .await
+            .expect(&format!("Failed to delete id: {:?}", id));
+        dataset.remove(index);
+    }
+
+    async fn fuzz_test(iterations: usize) {
+        let mut db = fill_db().await;
+        // Very shitty seed
+        let seed = [0u8; 32];
+        let mut rng = Pcg64::from_seed(seed);
+        let mut dataset = Vec::new();
+        for i in 0..iterations {
+            let val = rng.gen_range(0u8..10u8);
+            if val <= 1u8 {
+                let res = add_random_entry(&mut db, &mut rng).await;
+                dataset.push(res);
+            } else if !dataset.is_empty() && val == 2 {
+                delete_random_value(&mut db, &mut rng, &mut dataset).await;
+            } else if !dataset.is_empty() {
+                test_random_value(&mut db, &mut rng, &dataset).await;
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn fuzz_test_disk() {
+        std::env::set_var("MEMORY_LIMIT", 16_000_000.to_string());
+        // Roughly where we run out of memory
+        fuzz_test(314_000).await;
+    }
+
+    #[tokio::test]
+    async fn fuzz_test_nodisk() {
+        std::env::set_var("MEMORY_LIMIT", 1_000_000_000.to_string());
+        fuzz_test(1_000_000).await;
+        std::env::set_var("MEMORY_LIMIT", 16_000_000.to_string());
     }
 }

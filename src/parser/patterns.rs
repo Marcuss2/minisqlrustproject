@@ -1,6 +1,6 @@
+use crate::parser::macros::*;
 use lazy_static::lazy_static;
 use regex::{Regex, RegexBuilder};
-use crate::parser::macros::*;
 
 macro_rules! select_pattern {
     () => {
@@ -106,11 +106,7 @@ mod tests {
 
     #[test]
     fn test_select_wildcard() {
-        assert_pattern(
-            select_pattern!(),
-            "select * from c",
-            &["select", "*", "from", "c"],
-        )
+        assert_pattern(select_pattern!(), "select * from c", &["select", "*", "from", "c"])
     }
 
     #[test]
@@ -151,10 +147,6 @@ mod tests {
 
     #[test]
     fn test_drop_table() {
-        assert_pattern(
-            drop_pattern!(),
-            "drop table my_table",
-            &["drop", "table", "my_table"],
-        )
+        assert_pattern(drop_pattern!(), "drop table my_table", &["drop", "table", "my_table"])
     }
 }
