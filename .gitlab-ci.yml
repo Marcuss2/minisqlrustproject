@@ -27,4 +27,4 @@ lint:
 test:
   stage: test
   script:
-    - cargo test --verbose
+    - cargo test --verbose -- --test-threads=1

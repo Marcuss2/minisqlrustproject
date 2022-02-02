@@ -24,3 +24,7 @@ regex = "1"
 lazy_static = "1.4"
 cap = "0.1"
 client_sql = { path = "../client_sql" }
+
+[dev-dependencies]
+rand = "0.8.4"
+rand_pcg = "0.3.1"

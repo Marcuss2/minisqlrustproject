@@ -17,7 +17,9 @@ impl StreamProcessor {
         let deserialized: Action = serde_json::from_str(&str_command).unwrap();
 
         //get_command should be getting Action i quess (Command from client_sql lib)
-        let command = crate::parser::get_command(&deserialized.contents, self.database.tables.clone()).await?;
+        let command =
+            crate::parser::get_command(&deserialized.contents, self.database.tables.clone())
+                .await?;
         let response = match command {
             crate::parser::Command::Create { name, attributes } => {
                 self.database.create_table(&name, attributes).await?
