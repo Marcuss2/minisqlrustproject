@@ -167,26 +167,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "308cc39be01b73d0d18f82a0e7b2a3df85245f84af96fdddc5d202d27e47b86a"
 
 [[package]]
-name = "minisql"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "atomic-counter",
- "cap",
- "client_sql",
- "dotenv",
- "lazy_static",
- "rand",
- "rand_pcg",
- "regex",
- "ron",
- "serde",
- "serde_json",
- "tokio",
- "tokio-test",
-]
-
-[[package]]
 name = "mio"
 version = "0.7.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -415,6 +395,26 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "server_sql"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "atomic-counter",
+ "cap",
+ "client_sql",
+ "dotenv",
+ "lazy_static",
+ "rand",
+ "rand_pcg",
+ "regex",
+ "ron",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-test",
 ]
 
 [[package]]

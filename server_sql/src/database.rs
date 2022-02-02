@@ -550,7 +550,7 @@ mod tests {
         let seed = [0u8; 32];
         let mut rng = Pcg64::from_seed(seed);
         let mut dataset = Vec::new();
-        for i in 0..iterations {
+        for _ in 0..iterations {
             let val = rng.gen_range(0u8..10u8);
             if val <= 1u8 {
                 let res = add_random_entry(&mut db, &mut rng).await;
