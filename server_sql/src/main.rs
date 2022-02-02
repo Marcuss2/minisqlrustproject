@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use crate::stream_processor::StreamProcessor;
-use anyhow::Result;
 use dotenv::dotenv;
 use tokio::{
     io::{self, AsyncReadExt, AsyncWriteExt},
@@ -23,6 +22,7 @@ async fn main() -> io::Result<()> {
     //let url = std::env::var("BIND_URL").expect("BIND_URL must be set");
     let listener = TcpListener::bind("0.0.0.0:8000").await?;
     let stream_processor = Arc::new(stream_processor::StreamProcessor::default());
+
     loop {
         let (mut stream, _) = listener.accept().await?;
         let sp_handle = stream_processor.clone();
@@ -46,7 +46,7 @@ pub async fn process_stream(stream: &mut TcpStream, processor: &Arc<StreamProces
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 continue;
             }
-            Err(err) => {
+            Err(_) => {
                 break;
             }
         };
@@ -54,11 +54,11 @@ pub async fn process_stream(stream: &mut TcpStream, processor: &Arc<StreamProces
         let data = String::from_utf8(buffer[0..data_length].to_vec()).unwrap();
         match processor.process_str(data).await {
             Ok(s) => {
-                stream.write(s.as_bytes()).await;
+                stream.write(s.as_bytes()).await.unwrap();
             }
             Err(e) => {
                 let response = format!("{:?}", e);
-                stream.write(response.as_bytes()).await;
+                stream.write(response.as_bytes()).await.unwrap();
             }
         }
     }

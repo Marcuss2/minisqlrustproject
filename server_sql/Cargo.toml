@@ -1,5 +1,5 @@
 [package]
-name = "minisql"
+name = "server_sql"
 version = "0.1.0"
 authors = [
     "Marek Vrbka <469025@mail.muni.cz>",
@@ -8,8 +8,6 @@ authors = [
     "Pavel Kinc <493339@mail.muni.cz>",
 ]
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 anyhow = "1.0"

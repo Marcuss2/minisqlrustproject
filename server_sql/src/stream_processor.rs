@@ -2,10 +2,6 @@ use crate::database::Database;
 use ron::ser::to_string;
 
 use client_sql::Command as Action;
-use tokio::{
-    io::{self, AsyncReadExt, AsyncWriteExt},
-    net::{TcpListener, TcpStream},
-};
 
 #[derive(Default)]
 pub struct StreamProcessor {
@@ -16,7 +12,7 @@ impl StreamProcessor {
     pub async fn process_str(&self, str_command: String) -> anyhow::Result<String> {
         let deserialized: Action = serde_json::from_str(&str_command).unwrap();
 
-        //get_command should be getting Action i quess (Command from client_sql lib)
+        // get_command should be getting Action i quess (Command from client_sql lib)
         let command =
             crate::parser::get_command(&deserialized.contents, self.database.tables.clone())
                 .await?;
