@@ -22,7 +22,7 @@ pub enum Comparison {
     NotEqual(DataAttribute),
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Clone, Hash, Eq)]
 pub enum DataAttribute {
     String(String),
     Number(i64),
