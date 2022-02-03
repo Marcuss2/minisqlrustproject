@@ -42,7 +42,7 @@ impl StreamProcessor {
                 self.database.select(&table_name, attr_pos, &comparison, selected).await?
             }
             crate::parser::Command::Drop { name } => self.database.drop_table(&name).await?,
-            crate::parser::Command::CreateIndex { .. } => todo!(),
+            crate::parser::Command::CreateIndex { .. } => DatabaseResponse::Nothing,
         };
         let res = to_string(&response)?;
         Ok(res)
