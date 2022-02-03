@@ -19,6 +19,7 @@ pub enum Command {
     Delete { table_name: String, attr_pos: usize, comparison: Comparison },
     Select { table_name: String, attr_pos: usize, comparison: Comparison, selected: Vec<usize> },
     Drop { name: String },
+    CreateIndex { table_name: String, attr_positions: Vec<usize> },
 }
 
 const QUOTES: &[char] = &['\'', '"'];
@@ -36,7 +37,16 @@ pub async fn get_command(
         ["create", "table", table, attrs @ ..] => {
             Command::Create { name: table.to_string(), attributes: parse_attributes(attrs)? }
         }
-        ["create", "index", _index, "on", _table, _cols @ ..] => todo!(),
+        ["create", "index", _index, "on", _table, _cols @ ..] => {
+            return Err(UserError::Other("Named indices not supported yet!"))
+        }
+        ["create", "index", "on", table, cols @ ..] => Command::CreateIndex {
+            table_name: table.to_string(),
+            attr_positions: parse_cols(
+                cols,
+                tables.read().await.get(*table).ok_or(UserError::Other("No such table"))?,
+            )?,
+        },
         ["select", cols @ .., "from", table] => make_select_command(
             table,
             tables.read().await.get(*table).ok_or(UserError::Other("No such table"))?,
@@ -81,7 +91,7 @@ fn make_select_command(
     where_clause: Option<(&str, &str, &str)>,
 ) -> Result<Command, UserError> {
     let table_name = table_name.to_owned();
-    let selected = parse_selected(cols, table)?;
+    let selected = parse_cols(cols, table)?;
     if let Some((lhs, cmp, rhs)) = where_clause {
         let (attr_pos, comparison) = parse_comparison(lhs, cmp, rhs, table)?;
         Ok(Command::Select { table_name, selected, comparison, attr_pos })

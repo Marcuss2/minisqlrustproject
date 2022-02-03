@@ -8,7 +8,7 @@ pub fn get_col_to_ix_map(table: &DatabaseTable) -> HashMap<&str, usize> {
     table.attributes.iter().enumerate().map(|(ix, attr)| (attr.name.as_str(), ix)).collect()
 }
 
-pub fn parse_selected(cols: &[&str], table: &DatabaseTable) -> Result<Vec<usize>, UserError> {
+pub fn parse_cols(cols: &[&str], table: &DatabaseTable) -> Result<Vec<usize>, UserError> {
     if cols == ["*"] {
         Ok((0..table.attributes.len()).collect())
     } else {
