@@ -387,7 +387,7 @@ impl Database {
     }
 
     pub async fn tables(&self) -> Result<DatabaseResponse, DatabaseError> {
-        let tables = self.tables.read().await.keys().map(|k| k.clone()).collect();
+        let tables = self.tables.read().await.keys().cloned().collect();
         Ok(DatabaseResponse::Names(tables))
     }
 
