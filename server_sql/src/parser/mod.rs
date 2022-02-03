@@ -24,10 +24,6 @@ pub enum Command {
 
 const QUOTES: &[char] = &['\'', '"'];
 
-fn remove_quotes(str: &str) -> String {
-    if str.starts_with(QUOTES) { &str[1..str.len() - 1] } else { str }.to_owned()
-}
-
 pub async fn get_command(
     input: &str,
     tables: Arc<RwLock<HashMap<String, DatabaseTable>>>,
@@ -35,7 +31,6 @@ pub async fn get_command(
     let lowercased = capture_command(input)
         .into_iter()
         .map(|s| if s.starts_with(QUOTES) { s.to_owned() } else { s.to_ascii_lowercase() })
-        .map(|s| remove_quotes(&s))
         .collect::<Vec<_>>();
 
     let command = match lowercased.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
