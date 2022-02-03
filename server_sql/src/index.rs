@@ -2,7 +2,7 @@ use std::{collections::HashMap, io};
 
 use crate::database::DataAttribute;
 use std::collections::HashSet;
-use std::fs::{create_dir_all, remove_dir_all, File};
+use std::fs::{create_dir_all, remove_dir_all, File, remove_file};
 use std::io::{BufReader, Error, ErrorKind};
 use std::iter::FromIterator;
 use std::path::Path;
@@ -111,6 +111,12 @@ async fn index_delete(
 pub async fn index_drop(table_name: &str) -> io::Result<()> {
     let file_path = format!("./database/{}", table_name);
     remove_dir_all(Path::new(&file_path)).unwrap();
+    Ok(())
+}
+
+pub async fn index_drop_attr(table_name: &str, attr_name: &str) -> io::Result<()> {
+    let file_path = format!("./database/{}/{}", table_name, attr_name);
+    remove_file(Path::new(&file_path)).unwrap();
     Ok(())
 }
 

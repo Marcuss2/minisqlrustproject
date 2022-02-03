@@ -11,7 +11,7 @@
   <component name="ChangeListManager">
     <list default="true" id="894d77b0-c621-4287-86c5-390dcf6aa6b0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/server_sql/src/stream_processor.rs" beforeDir="false" afterPath="$PROJECT_DIR$/server_sql/src/stream_processor.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/server_sql/src/index.rs" beforeDir="false" afterPath="$PROJECT_DIR$/server_sql/src/index.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
