@@ -23,17 +23,19 @@ pub fn parse_values(
     values: &[&str],
     table: &DatabaseTable,
 ) -> Result<Vec<DataAttribute>, UserError> {
-    if values.len() > table.attributes.len() {
+    if values.len() > table.attributes.len() - 1 {
         Err(UserError::Other("Too many values"))
     } else {
-        values
+        (&[""])
             .iter()
+            .chain(values.iter())
             .zip(table.attributes.iter())
             .map(|(val, attr)| {
+                println!("{:?}{:?}{:?}", val, attr.name, attr.attribute_type);
                 Ok(match attr.attribute_type {
                     AttributeType::Id => {
                         if *val != "null" {
-                            DataAttribute::Id(parse_i64(val)?)
+                            DataAttribute::NoneId
                         } else {
                             return Err(UserError::Other("Bad type"));
                         }
