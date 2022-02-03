@@ -120,7 +120,7 @@ pub async fn index_drop_attr(table_name: &str, attr_name: &str) -> io::Result<()
     Ok(())
 }
 
-fn get_index_map(table_name: &str, attr_name: &str) -> HashMap<String, Vec<DataAttribute>> {
+pub fn get_index_map(table_name: &str, attr_name: &str) -> HashMap<String, Vec<DataAttribute>> {
     let file = File::open(Path::new(&format!("./database/{}/{}", table_name, attr_name))).unwrap();
     let reader = BufReader::new(file);
     serde_json::from_reader(reader).unwrap()
