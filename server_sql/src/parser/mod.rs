@@ -49,7 +49,7 @@ pub async fn get_command(
             cols,
             Some((a, cmp, b)),
         )?,
-        ["insert", "into", table, "where", values @ ..] => Command::Insert {
+        ["insert", "into", table, "values", values @ ..] => Command::Insert {
             table_name: table.to_string(),
             data: DataAttributes {
                 attributes: parse_values(
