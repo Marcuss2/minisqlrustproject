@@ -34,6 +34,18 @@ macro_rules! create_index_pattern {
         s_delimited!(
             "(CREATE)",
             "(INDEX)",
+            "(ON)",
+            captured!(string_or_ident_pattern!()),
+            maybe_s_delimited!(r"\(", commas!(captured!(string_or_ident_pattern!())), r"\)")
+        )
+    };
+}
+
+macro_rules! create_named_index_pattern {
+    () => {
+        s_delimited!(
+            "(CREATE)",
+            "(INDEX)",
             captured!(optional!(string_or_ident_pattern!())),
             "(ON)",
             captured!(string_or_ident_pattern!()),
@@ -65,6 +77,7 @@ pub fn capture_command(input: &str) -> Vec<&str> {
         static ref RE: Regex = RegexBuilder::new(anchored!(command!(unite!(
             create_table_pattern!(),
             create_index_pattern!(),
+            create_named_index_pattern!(),
             select_pattern!(),
             insert_pattern!(),
             delete_pattern!(),
@@ -122,6 +135,15 @@ mod tests {
     fn test_create_index() {
         assert_pattern(
             create_index_pattern!(),
+            "create index on t (a, b)",
+            &["create", "index", "on", "t", "a", "b"],
+        )
+    }
+
+    #[test]
+    fn test_create_named_index() {
+        assert_pattern(
+            create_named_index_pattern!(),
             "create index ab_ix on t (a, b)",
             &["create", "index", "ab_ix", "on", "t", "a", "b"],
         )
