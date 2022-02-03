@@ -31,7 +31,6 @@ pub fn parse_values(
             .chain(values.iter())
             .zip(table.attributes.iter())
             .map(|(val, attr)| {
-                println!("{:?}{:?}{:?}", val, attr.name, attr.attribute_type);
                 Ok(match attr.attribute_type {
                     AttributeType::Id => {
                         if *val != "null" {
