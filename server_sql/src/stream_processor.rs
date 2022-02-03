@@ -13,14 +13,17 @@ impl StreamProcessor {
     pub async fn process_str(&self, str_command: String) -> anyhow::Result<String> {
         let deserialized: Action = serde_json::from_str(&str_command).unwrap();
 
-        match &deserialized.cmd{
+        match &deserialized.cmd {
             CommandType::Tables => {
                 return Ok(format!("{:?}", self.database.tables().await?));
-            },
-            CommandType::Columns => {
-                return Ok(format!("{:?}", self.database.table_attributes(&deserialized.contents).await?));
             }
-            _ => {},
+            CommandType::Columns => {
+                return Ok(format!(
+                    "{:?}",
+                    self.database.table_attributes(&deserialized.contents).await?
+                ));
+            }
+            _ => {}
         };
         let command =
             crate::parser::get_command(&deserialized.contents, self.database.tables.clone())
